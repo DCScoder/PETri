@@ -1,7 +1,7 @@
 ###################################################################################
 #
 #    Script:    PETri.py
-#    Version:   1.0
+#    Version:   1.1
 #    Author:    Dan Saunders
 #    Contact:   dcscoder@gmail.com
 #    Purpose:   Portable Executable (PE) Triage
@@ -29,10 +29,11 @@ import datetime
 import time
 import re
 import hashlib
+import peutils
 import pefile
 import hexdump
 
-__version__ = 'v1.0'
+__version__ = 'v1.1'
 __author__ = 'Dan Saunders'
 __email__ = 'dcscoder@gmail.com'
 
@@ -91,7 +92,7 @@ def main():
     if result == True:
         print("\nFile signature match for PE binary, proceeding with analysis...")
     else:
-        sys.exit("\nFile is not a PE binary, terminating analysis.")
+        sys.exit("\nFile signature did NOT match for a PE binary, terminating analysis.")
 
     # Read Data
     f = open(binary, "rb")
@@ -110,10 +111,18 @@ def main():
     report.write("\nPETri.py " + __version__ + " Author: " + __author__ + " " + __email__ + "\n")
     report.write("~" * 53)
 
-    # Basic
+    # Metadata
     report.write("\n\n########## Metadata ##########\n\n")
-    report.write("File Name:          " + name + "\n")
-    report.write("File Size:          " + str(size) + " bytes" + "\n")
+    report.write("File Name:               " + name + "\n")
+    report.write("File Size:               " + str(size) + " bytes" + "\n")
+
+    # Packed
+    report.write("\n########## Packed ##########\n\n")
+    packed = peutils.is_probably_packed(pe)
+    if packed == 1:
+        report.write("Is Packed?:              PACKED." + "\n")
+    else:
+        report.write("Is Packed?:              Not Packed." + "\n")
 
     # PE Header
     report.write("\n########## PE Header ##########\n\n")
@@ -122,13 +131,13 @@ def main():
         h = "0x5a4d (MZ)"
     else:
         h = "Unknown"
-    report.write("DOS Header:         " + h + "\n")
+    report.write("DOS Header:              " + h + "\n")
     sig = pe.NT_HEADERS.Signature
     if hex(sig == '0x4550'):
         s = "0x4550 (PE)"
     else:
         s = "Unknown"
-    report.write("NT Header:          " + s + "\n")
+    report.write("NT Header:               " + s + "\n")
     hdr = (hexdump.hexdump(header, result='return'))
     report.write("\n" + hdr + "\n")
 
@@ -161,11 +170,11 @@ def main():
     sha512 = h4.hexdigest()
     imphash = pe.get_imphash()
     report.write("\n########## Hash Values ##########\n\n")
-    report.write("MD5:                " + md5 + "\n")
-    report.write("SHA1:               " + sha1 + "\n")
-    report.write("SHA256:             " + sha256 + "\n")
-    report.write("SHA512:             " + sha512 + "\n")
-    report.write("Imphash:            " + imphash + "\n")
+    report.write("MD5:                     " + md5 + "\n")
+    report.write("SHA1:                    " + sha1 + "\n")
+    report.write("SHA256:                  " + sha256 + "\n")
+    report.write("SHA512:                  " + sha512 + "\n")
+    report.write("Imphash:                 " + imphash + "\n")
 
     # COFF File Header (Object and Image)
     report.write("\n########## COFF File Header ##########\n\n")
@@ -174,113 +183,113 @@ def main():
         d = "Yes"
     else:
         d = "No"
-    report.write("Is DLL?:            " + d + "\n")
+    report.write("Is DLL?:                 " + d + "\n")
     machine = pe.FILE_HEADER.Machine
-    report.write("Target Machine:     " + cpu.get(machine) + "\n")
+    report.write("Target Machine:          " + cpu.get(machine) + "\n")
     sections = pe.FILE_HEADER.NumberOfSections
-    report.write("No of Sections:     " + (str(sections)) + "\n")
+    report.write("No of Sections:          " + (str(sections)) + "\n")
     compiled = pe.FILE_HEADER.TimeDateStamp
-    report.write("Compiled Date:      " + UNIX10(compiled) + "\n")
+    report.write("Compiled Date:           " + UNIX10(compiled) + "\n")
     symbol_table = pe.FILE_HEADER.PointerToSymbolTable
-    report.write("Sym Table Pointer:  " + (hex(symbol_table)) + "\n")
+    report.write("Symbol Table Pointer:    " + (hex(symbol_table)) + "\n")
     no_symbols = pe.FILE_HEADER.NumberOfSymbols
-    report.write("No of Symbols:      " + (str(no_symbols)) + "\n")
+    report.write("No of Symbols:           " + (str(no_symbols)) + "\n")
     op_header_size = pe.FILE_HEADER.SizeOfOptionalHeader
-    report.write("Opt. Header Size:   " + (str(op_header_size)) + " bytes" + "\n")
+    report.write("Optional Header Size:    " + (str(op_header_size)) + " bytes" + "\n")
     characteristics = pe.FILE_HEADER.Characteristics
-    report.write("Characteristics:    " + (hex(characteristics)) + "\n")
+    report.write("Characteristics:         " + (hex(characteristics)) + "\n")
 
     # Optional Header Standard Fields (Image Only)
     report.write("\n########## Optional File Header ##########\n\n")
     mag = pe.OPTIONAL_HEADER.Magic
-    report.write("Magic:              " + magic_no.get(mag) + "\n")
+    report.write("Magic:                   " + magic_no.get(mag) + "\n")
     malv = pe.OPTIONAL_HEADER.MajorLinkerVersion
-    report.write("Major Link Version: " + str(malv) + "\n")
+    report.write("Major Link Version:      " + str(malv) + "\n")
     milv = pe.OPTIONAL_HEADER.MinorLinkerVersion
-    report.write("Minor Link Version: " + str(milv) + "\n")
+    report.write("Minor Link Version:      " + str(milv) + "\n")
     text_section_size = pe.OPTIONAL_HEADER.SizeOfCode
-    report.write("Code Size:          " + str(text_section_size) + " bytes" + "\n")
+    report.write("Code Size:               " + str(text_section_size) + " bytes" + "\n")
     soid = pe.OPTIONAL_HEADER.SizeOfInitializedData
-    report.write("Initialised Size:   " + str(soid) + " bytes" + "\n")
+    report.write("Initialised Size:        " + str(soid) + " bytes" + "\n")
     soud = pe.OPTIONAL_HEADER.SizeOfUninitializedData
-    report.write("Uninitialised Size: " + str(soud) + " bytes" + "\n")
+    report.write("Uninitialised Size:      " + str(soud) + " bytes" + "\n")
     entry = pe.OPTIONAL_HEADER.AddressOfEntryPoint
-    report.write("Entry Pointer:      " + hex(entry) + "\n")
+    report.write("Entry Pointer:           " + hex(entry) + "\n")
     # Optional Header - Extension Fields (Image Only)
-    report.write("-" * 35 + "\n")
+    report.write("-" * 40 + "\n")
     boc = pe.OPTIONAL_HEADER.BaseOfCode
-    report.write("Base of Code:       " + hex(boc) + "\n")
+    report.write("Base of Code:            " + hex(boc) + "\n")
     try:
         bod = pe.OPTIONAL_HEADER.BaseOfData
-        report.write("Base of Data:       " + hex(bod) + "\n")
+        report.write("Base of Data:            " + hex(bod) + "\n")
     except:
-        report.write("Base of Data:       " + "No BaseOfData field.\n")
+        report.write("Base of Data:            " + "No BaseOfData field.\n")
     ib = pe.OPTIONAL_HEADER.ImageBase
-    report.write("Image Base:         " + hex(ib) + "\n")
+    report.write("Image Base:              " + hex(ib) + "\n")
     sa = pe.OPTIONAL_HEADER.SectionAlignment
-    report.write("Section Alignment:  " + hex(sa) + "\n")
+    report.write("Section Alignment:       " + hex(sa) + "\n")
     fa = pe.OPTIONAL_HEADER.FileAlignment
-    report.write("File Alignment:     " + hex(fa) + "\n")
+    report.write("File Alignment:          " + hex(fa) + "\n")
     maosv = pe.OPTIONAL_HEADER.MajorOperatingSystemVersion
-    report.write("Major OS Version:   " + str(maosv) + "\n")
+    report.write("Major OS Version:        " + str(maosv) + "\n")
     miosv = pe.OPTIONAL_HEADER.MinorOperatingSystemVersion
-    report.write("Minor OS Version:   " + str(miosv) + "\n")
+    report.write("Minor OS Version:        " + str(miosv) + "\n")
     maiv = pe.OPTIONAL_HEADER.MajorImageVersion
-    report.write("Major Img Version:  " + str(maiv) + "\n")
+    report.write("Major Image Version:     " + str(maiv) + "\n")
     miiv = pe.OPTIONAL_HEADER.MinorImageVersion
-    report.write("Minor OS Version:   " + str(miiv) + "\n")
+    report.write("Minor OS Version:        " + str(miiv) + "\n")
     massv = pe.OPTIONAL_HEADER.MajorSubsystemVersion
-    report.write("Major Sub Version:  " + str(massv) + "\n")
+    report.write("Major Sub Version:       " + str(massv) + "\n")
     missv = pe.OPTIONAL_HEADER.MinorSubsystemVersion
-    report.write("Minor Sub Version:  " + str(missv) + "\n")
+    report.write("Minor Sub Version:       " + str(missv) + "\n")
     w32v = pe.OPTIONAL_HEADER.Reserved1
-    report.write("Win32 Version:      " + str(w32v) + "\n")
+    report.write("Win32 Version:           " + str(w32v) + "\n")
     soi = pe.OPTIONAL_HEADER.SizeOfImage
-    report.write("Size of Image:      " + str(soi) + " bytes" + "\n")
+    report.write("Size of Image:           " + str(soi) + " bytes" + "\n")
     soh = pe.OPTIONAL_HEADER.SizeOfHeaders
-    report.write("Size of Headers:    " + str(soh) + " bytes" + "\n")
+    report.write("Size of Headers:         " + str(soh) + " bytes" + "\n")
     csum = pe.OPTIONAL_HEADER.CheckSum
-    report.write("CheckSum:           " + hex(csum) + "\n")
+    report.write("CheckSum:                " + hex(csum) + "\n")
     ss = pe.OPTIONAL_HEADER.Subsystem
-    report.write("Subsystem:          " + subsystem.get(ss) + "\n")
+    report.write("Subsystem:               " + subsystem.get(ss) + "\n")
     dllc = pe.OPTIONAL_HEADER.DllCharacteristics
     if dllchar.get(dllc) is not None:
-        report.write("DllCharacteristics: " + dllchar.get(dllc) + "\n")
+        report.write("DllCharacteristics:      " + dllchar.get(dllc) + "\n")
     else:
-        report.write("DllCharacteristics: " + str(dllc) + " - Unknown DLL Characteristic.\n")
+        report.write("DllCharacteristics:      " + str(dllc) + " - Unknown DLL Characteristic.\n")
     sosr = pe.OPTIONAL_HEADER.SizeOfStackReserve
-    report.write("Size of Stack Res:  " + str(sosr) + " bytes" + "\n")
+    report.write("Size of Stack Res:       " + str(sosr) + " bytes" + "\n")
     sosc = pe.OPTIONAL_HEADER.SizeOfStackCommit
-    report.write("Size of Stack Com:  " + str(sosc) + " bytes" + "\n")
+    report.write("Size of Stack Com:       " + str(sosc) + " bytes" + "\n")
     sohr = pe.OPTIONAL_HEADER.SizeOfHeapReserve
-    report.write("Size of Heap Res:   " + str(sohr) + " bytes" + "\n")
+    report.write("Size of Heap Reserve:    " + str(sohr) + " bytes" + "\n")
     sohc = pe.OPTIONAL_HEADER.SizeOfHeapCommit
-    report.write("Size of Heap Com:   " + str(sohc) + " bytes" + "\n")
+    report.write("Size of Heap Committ:    " + str(sohc) + " bytes" + "\n")
     lf = pe.OPTIONAL_HEADER.LoaderFlags
-    report.write("Loader Flags:       " + str(lf) + "\n")
+    report.write("Loader Flags:            " + str(lf) + "\n")
     nors = pe.OPTIONAL_HEADER.NumberOfRvaAndSizes
-    report.write("No of Rva & Sizes:  " + str(nors) + "\n")
+    report.write("No of Rva & Sizes:       " + str(nors) + "\n")
     
     # Sections
     report.write("\n########## Sections ##########\n")
     for section in pe.sections:
-        report.write("\nSection Name:       " + section.Name.decode('utf-8'))
-        report.write("\nVirtual Address:    " + hex(section.VirtualAddress))
-        report.write("\nVirtual Size:       " + str(section.Misc_VirtualSize) + " bytes")
-        report.write("\nPointer to Raw:     " + hex(section.PointerToRawData))
-        report.write("\nRaw Size:           " + str(section.SizeOfRawData) + " bytes")
-        report.write("\nEntropy:            " + str(section.get_entropy()))
-        report.write("\nMD5:                " + str(section.get_hash_md5()))
-        report.write("\nSHA1:               " + str(section.get_hash_sha1()))
-        report.write("\nSHA256:             " + str(section.get_hash_sha256()))
-        report.write("\nSHA512:             " + str(section.get_hash_sha512()) + "\n")
+        report.write("\nSection Name:            " + section.Name.decode('utf-8'))
+        report.write("\nVirtual Address:         " + hex(section.VirtualAddress))
+        report.write("\nVirtual Size:            " + str(section.Misc_VirtualSize) + " bytes")
+        report.write("\nPointer to Raw:          " + hex(section.PointerToRawData))
+        report.write("\nRaw Size:                " + str(section.SizeOfRawData) + " bytes")
+        report.write("\nEntropy:                 " + str(section.get_entropy()))
+        report.write("\nMD5:                     " + str(section.get_hash_md5()))
+        report.write("\nSHA1:                    " + str(section.get_hash_sha1()))
+        report.write("\nSHA256:                  " + str(section.get_hash_sha256()))
+        report.write("\nSHA512:                  " + str(section.get_hash_sha512()) + "\n")
 
     # Data Directories
     report.write("\n########## Data Directories ##########\n")
     for dir in pe.OPTIONAL_HEADER.DATA_DIRECTORY:
-        report.write("\nDirectory Name:     " + str(dir.name))
-        report.write("\nVirtual Address:    " + hex(dir.VirtualAddress))
-        report.write("\nSize:               " + str(dir.Size) + " bytes")
+        report.write("\nDirectory Name:          " + str(dir.name))
+        report.write("\nVirtual Address:         " + hex(dir.VirtualAddress))
+        report.write("\nSize:                    " + str(dir.Size) + " bytes")
         report.write("\n")
 
     # Imports
@@ -289,7 +298,7 @@ def main():
         for entry in pe.DIRECTORY_ENTRY_IMPORT:
             report.write("\n" + entry.dll.decode('utf-8') + "\n")
             for im in entry.imports:
-                report.write("------------ Offset: " + hex(im.address) + " | Import: " + im.name.decode('utf-8') + "\n")
+                report.write("------------ Offset: " + hex(im.address) + " | Import Function: " + im.name.decode('utf-8') + "\n")
     except:
         report.write("\nNo import symbols identified.\n")
 
@@ -297,12 +306,12 @@ def main():
     report.write("\n########## Exports ##########\n")
     try:
         for exp in pe.DIRECTORY_ENTRY_EXPORT.symbols:
-            report.write("\n------------ Offset: " + hex(pe.OPTIONAL_HEADER.ImageBase + exp.address) + " | Export: " + str(exp.name.decode('utf-8')))
+            report.write("\n------------ Offset: " + hex(pe.OPTIONAL_HEADER.ImageBase + exp.address) + " | Export Function: " + str(exp.name.decode('utf-8')))
 
     except:
         report.write("\nNo export symbols identified.\n")
 
-    print("\nAnalysis completed!")
+    print("\nAnalysis completed, see report for further details!")
 
 if __name__ == "__main__":
     main()
